@@ -9,7 +9,7 @@ import { OrderCard } from "@/components/OrderCard";
 import { OrderFormDialog } from "@/components/OrderFormDialog";
 import { fetchOrders, SECTOR_LABEL, type Order, type Sector } from "@/lib/orders";
 import { generateProductionPdf } from "@/lib/generate-pdf";
-import logoAsset from "@/assets/nutrimilho-logo.png.asset.json";
+import logoUrl from "@/assets/nutrimilho-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -46,7 +46,7 @@ function Index() {
       <header className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <img src={logoAsset.url} alt="Nutrimilho" className="h-12 w-auto" />
+            <img src={logoUrl} alt="Nutrimilho" className="h-12 w-auto" />
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Programação de Produção</h1>
               <p className="text-sm text-muted-foreground mt-1">Gerencie as ordens de Extrusora e Moagem.</p>

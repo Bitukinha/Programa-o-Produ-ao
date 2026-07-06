@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { SECTOR_LABEL, STATUS_LABEL, type Order, type Sector } from "./orders";
-import logoAsset from "@/assets/nutrimilho-logo.png.asset.json";
+import logoUrl from "@/assets/nutrimilho-logo.png";
 
 const GREEN: [number, number, number] = [34, 110, 50];
 const GREEN_DARK: [number, number, number] = [20, 70, 32];
@@ -53,7 +53,7 @@ function buildShortLabel() {
 }
 
 async function loadLogoDataUrl(): Promise<string> {
-  const res = await fetch(logoAsset.url);
+  const res = await fetch(logoUrl);
   const blob = await res.blob();
   return await new Promise((resolve, reject) => {
     const reader = new FileReader();
