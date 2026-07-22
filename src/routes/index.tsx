@@ -118,6 +118,12 @@ function Index() {
         )}
       </main>
 
+      <footer className="border-t bg-card">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-muted-foreground">
+          © 2026 Nutrimilho - (Novaes Tech) | Todos os direitos reservados
+        </div>
+      </footer>
+
       <OrderFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
