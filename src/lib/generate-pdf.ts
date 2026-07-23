@@ -1,6 +1,14 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { SECTOR_LABEL, STATUS_LABEL, type Order, type Sector } from "./orders";
+import {
+  EMBALAGEM_LABEL,
+  EMBALAGEM_UNIT_LABEL,
+  SECTOR_LABEL,
+  STATUS_LABEL,
+  type Order,
+  type ProductionEntry,
+  type Sector,
+} from "./orders";
 import logoUrl from "@/assets/nutrimilho-logo.png";
 
 const GREEN: [number, number, number] = [34, 110, 50];
@@ -63,7 +71,15 @@ async function loadLogoDataUrl(): Promise<string> {
   });
 }
 
-export async function generateProductionPdf(orders: Order[], dateLabel = buildTodayAndTomorrowLabel()) {
+function producedFor(entries: ProductionEntry[], orderId: string): number {
+  return entries.filter((e) => e.order_id === orderId).reduce((sum, e) => sum + e.quantidade, 0);
+}
+
+export async function generateProductionPdf(
+  orders: Order[],
+  entries: ProductionEntry[] = [],
+  dateLabel = buildTodayAndTomorrowLabel(),
+) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 40;
@@ -107,7 +123,7 @@ export async function generateProductionPdf(orders: Order[], dateLabel = buildTo
     cursorY += 40;
 
     for (const op of list) {
-      cursorY = renderOrder(doc, op, cursorY, margin, pageW);
+      cursorY = renderOrder(doc, op, producedFor(entries, op.id), cursorY, margin, pageW);
     }
     cursorY += 6;
   }
@@ -137,7 +153,7 @@ function ensureSpace(doc: jsPDF, y: number, needed: number): number {
   return y;
 }
 
-function renderOrder(doc: jsPDF, op: Order, startY: number, margin: number, pageW: number): number {
+function renderOrder(doc: jsPDF, op: Order, produced: number, startY: number, margin: number, pageW: number): number {
   // Order title
   let y = ensureSpace(doc, startY, 80);
   doc.setFont("helvetica", "bold");
@@ -177,8 +193,14 @@ function renderOrder(doc: jsPDF, op: Order, startY: number, margin: number, page
   add("Produto", op.produto);
   add("Linha de envase", op.linha_envase);
   add("Total do Pedido", op.total_pedido);
-  add("Embalagem", op.embalagem);
-  if (op.turno) add("Turno", op.turno);
+  if (op.embalagem_tipo) {
+    add("Embalagem", `${EMBALAGEM_LABEL[op.embalagem_tipo]}${op.peso_unitario_kg ? ` de ${op.peso_unitario_kg}kg` : ""}`);
+  }
+  if (op.quantidade_total) {
+    const unit = op.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[op.embalagem_tipo] : "un.";
+    const pct = Math.min(100, Math.round((produced / op.quantidade_total) * 100));
+    add("Produzido", `${produced} / ${op.quantidade_total} ${unit} (${pct}%)`);
+  }
 
   autoTable(doc, {
     startY: y,
@@ -212,4 +234,93 @@ function renderOrder(doc: jsPDF, op: Order, startY: number, margin: number, page
   }
 
   return y + 12;
+}
+
+export async function generateOrderPdf(op: Order, entries: ProductionEntry[]) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 40;
+
+  try {
+    const logo = await loadLogoDataUrl();
+    doc.addImage(logo, "PNG", margin, 30, 110, 36);
+  } catch {
+    // ignore logo errors
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...GREEN);
+  doc.text(`${SECTOR_LABEL[op.sector]} — ${op.sequence}ª Ordem de Produção`, pageW / 2, 60, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(...MUTED);
+  doc.text(`OP Nº ${op.op_number || "—"} · ${op.cliente}`, pageW / 2, 78, { align: "center" });
+
+  const produced = entries.reduce((sum, e) => sum + e.quantidade, 0);
+  let cursorY = renderOrder(doc, op, produced, 105, margin, pageW);
+
+  if (op.quantidade_total) {
+    const pct = Math.min(100, Math.round((produced / op.quantidade_total) * 100));
+    const unit = op.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[op.embalagem_tipo] : "un.";
+
+    cursorY = ensureSpace(doc, cursorY, 50);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...GREEN_DARK);
+    doc.text(`Progresso: ${produced} / ${op.quantidade_total} ${unit} (${pct}%)`, margin, cursorY);
+    cursorY += 8;
+
+    const barW = pageW - margin * 2;
+    const barH = 14;
+    doc.setFillColor(238, 238, 238);
+    doc.roundedRect(margin, cursorY, barW, barH, 4, 4, "F");
+    if (pct > 0) {
+      doc.setFillColor(...GREEN);
+      doc.roundedRect(margin, cursorY, (barW * pct) / 100, barH, 4, 4, "F");
+    }
+    cursorY += barH + 20;
+  }
+
+  cursorY = ensureSpace(doc, cursorY, 40);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...GREEN);
+  doc.text("Histórico de lançamentos", margin, cursorY);
+  cursorY += 10;
+
+  const sorted = [...entries].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  if (sorted.length === 0) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(...MUTED);
+    doc.text("Nenhum lançamento de produção registrado.", margin, cursorY + 14);
+  } else {
+    const unit = op.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[op.embalagem_tipo] : "un.";
+    autoTable(doc, {
+      startY: cursorY,
+      margin: { left: margin, right: margin },
+      head: [["Data/Hora", "Turno", `Quantidade (${unit})`]],
+      body: sorted.map((e) => [
+        new Date(e.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
+        e.turno,
+        String(e.quantidade),
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontStyle: "bold" },
+      styles: { fontSize: 10, cellPadding: 5, textColor: [20, 20, 20], lineColor: [221, 221, 221] },
+    });
+  }
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text(`Página ${i} de ${pageCount}`, pageW - margin, doc.internal.pageSize.getHeight() - 20, { align: "right" });
+  }
+
+  doc.save(`ordem-${op.sequence}-${op.op_number || op.id.slice(0, 8)}.pdf`);
 }

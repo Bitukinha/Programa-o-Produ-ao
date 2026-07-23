@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { OrderCard } from "@/components/OrderCard";
 import { OrderFormDialog } from "@/components/OrderFormDialog";
-import { fetchOrders, SECTOR_LABEL, type Order, type Sector } from "@/lib/orders";
+import { fetchOrders, fetchProductionEntries, SECTOR_LABEL, type Order, type Sector } from "@/lib/orders";
 import { generateProductionPdf } from "@/lib/generate-pdf";
 import logoUrl from "@/assets/nutrimilho-logo.png";
 
@@ -23,6 +23,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { data: orders, isLoading } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders });
+  const { data: entries } = useQuery({ queryKey: ["production-entries"], queryFn: fetchProductionEntries });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
   const [defaultSector, setDefaultSector] = useState<Sector>("extrusora");
@@ -62,7 +63,7 @@ function Index() {
                   return;
                 }
                 try {
-                  await generateProductionPdf(orders);
+                  await generateProductionPdf(orders, entries ?? []);
                   toast.success("PDF gerado com sucesso");
                 } catch (e) {
                   toast.error((e as Error).message);
@@ -109,7 +110,9 @@ function Index() {
                   </div>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {list.map((o) => <OrderCard key={o.id} order={o} onEdit={openEdit} />)}
+                    {list.map((o) => (
+                      <OrderCard key={o.id} order={o} entries={entries ?? []} onEdit={openEdit} />
+                    ))}
                   </div>
                 )}
               </section>

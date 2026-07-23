@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const sectorSchema = z.enum(["extrusora", "moagem"]);
 const statusSchema = z.enum(["pendente", "em_producao", "concluida"]);
+const embalagemTipoSchema = z.enum(["bigbag", "saco"]);
 
 const orderInsertSchema = z.object({
   cliente: z.string().min(1),
@@ -13,11 +14,11 @@ const orderInsertSchema = z.object({
   peneira: z.string().nullable().optional(),
   linha_envase: z.string().nullable().optional(),
   total_pedido: z.string().nullable().optional(),
-  embalagem: z.string().nullable().optional(),
+  embalagem_tipo: embalagemTipoSchema.nullable().optional(),
+  peso_unitario_kg: z.number().nullable().optional(),
+  quantidade_total: z.number().int().nullable().optional(),
   observacao: z.string().nullable().optional(),
   status: statusSchema.optional(),
-  turno: z.string().nullable().optional(),
-  scheduled_date: z.string().nullable().optional(),
 });
 
 const orderUpdateSchema = orderInsertSchema.partial();

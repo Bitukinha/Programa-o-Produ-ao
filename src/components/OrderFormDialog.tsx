@@ -23,6 +23,9 @@ import {
 import {
   createOrder,
   updateOrder,
+  EMBALAGEM_LABEL,
+  PESO_PRESETS,
+  type EmbalagemTipo,
   type Order,
   type OrderInsert,
   type Sector,
@@ -45,16 +48,17 @@ const empty = (sector: Sector): OrderInsert => ({
   peneira: "",
   linha_envase: "",
   total_pedido: "",
-  embalagem: "",
+  embalagem_tipo: null,
+  peso_unitario_kg: null,
+  quantidade_total: null,
   observacao: "",
-  turno: "",
   status: "pendente",
-  scheduled_date: null,
 });
 
 export function OrderFormDialog({ open, onOpenChange, order, defaultSector = "extrusora" }: Props) {
   const qc = useQueryClient();
   const [form, setForm] = useState<OrderInsert>(empty(defaultSector));
+  const [pesoCustom, setPesoCustom] = useState(false);
 
   useEffect(() => {
     if (order) {
@@ -67,14 +71,20 @@ export function OrderFormDialog({ open, onOpenChange, order, defaultSector = "ex
         peneira: order.peneira ?? "",
         linha_envase: order.linha_envase ?? "",
         total_pedido: order.total_pedido ?? "",
-        embalagem: order.embalagem ?? "",
+        embalagem_tipo: order.embalagem_tipo ?? null,
+        peso_unitario_kg: order.peso_unitario_kg ?? null,
+        quantidade_total: order.quantidade_total ?? null,
         observacao: order.observacao ?? "",
-        turno: order.turno ?? "",
         status: order.status,
-        scheduled_date: order.scheduled_date,
       });
+      setPesoCustom(
+        order.embalagem_tipo != null &&
+          order.peso_unitario_kg != null &&
+          !PESO_PRESETS[order.embalagem_tipo].includes(order.peso_unitario_kg),
+      );
     } else {
       setForm(empty(defaultSector));
+      setPesoCustom(false);
     }
   }, [order, defaultSector, open]);
 
@@ -93,6 +103,8 @@ export function OrderFormDialog({ open, onOpenChange, order, defaultSector = "ex
 
   const set = <K extends keyof OrderInsert>(k: K, v: OrderInsert[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const pesoOptions = form.embalagem_tipo ? PESO_PRESETS[form.embalagem_tipo] : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,22 +158,73 @@ export function OrderFormDialog({ open, onOpenChange, order, defaultSector = "ex
             <Input value={form.linha_envase ?? ""} onChange={(e) => set("linha_envase", e.target.value)} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Total do Pedido</Label>
+          <div className="space-y-2 col-span-2">
+            <Label>Total do Pedido (descrição)</Label>
             <Input value={form.total_pedido ?? ""} onChange={(e) => set("total_pedido", e.target.value)} placeholder="40 BIG BAGS DE 800KG" />
-          </div>
-          <div className="space-y-2">
-            <Label>Embalagem</Label>
-            <Input value={form.embalagem ?? ""} onChange={(e) => set("embalagem", e.target.value)} />
           </div>
 
           <div className="space-y-2">
-            <Label>Turno</Label>
-            <Input value={form.turno ?? ""} onChange={(e) => set("turno", e.target.value)} placeholder="A / B / C" />
+            <Label>Embalagem</Label>
+            <Select
+              value={form.embalagem_tipo ?? ""}
+              onValueChange={(v) => {
+                const tipo = v as EmbalagemTipo;
+                set("embalagem_tipo", tipo);
+                setPesoCustom(false);
+                set("peso_unitario_kg", PESO_PRESETS[tipo][0]);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bigbag">{EMBALAGEM_LABEL.bigbag}</SelectItem>
+                <SelectItem value="saco">{EMBALAGEM_LABEL.saco}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
-            <Label>Data programada</Label>
-            <Input type="date" value={form.scheduled_date ?? ""} onChange={(e) => set("scheduled_date", e.target.value || null)} />
+            <Label>Peso unitário (kg)</Label>
+            {!pesoCustom ? (
+              <Select
+                value={form.peso_unitario_kg != null ? String(form.peso_unitario_kg) : ""}
+                onValueChange={(v) => {
+                  if (v === "outro") {
+                    setPesoCustom(true);
+                    set("peso_unitario_kg", null);
+                  } else {
+                    set("peso_unitario_kg", Number(v));
+                  }
+                }}
+                disabled={!form.embalagem_tipo}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {pesoOptions.map((p) => (
+                    <SelectItem key={p} value={String(p)}>{p} kg</SelectItem>
+                  ))}
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                type="number"
+                min={1}
+                autoFocus
+                value={form.peso_unitario_kg ?? ""}
+                onChange={(e) => set("peso_unitario_kg", e.target.value ? Number(e.target.value) : null)}
+                placeholder="Peso em kg"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2 col-span-2">
+            <Label>Quantidade total ({form.embalagem_tipo === "saco" ? "sacos" : "big bags"})</Label>
+            <Input
+              type="number"
+              min={1}
+              value={form.quantidade_total ?? ""}
+              onChange={(e) => set("quantidade_total", e.target.value ? Number(e.target.value) : null)}
+              placeholder="Meta a ser produzida"
+            />
           </div>
 
           <div className="space-y-2 col-span-2">

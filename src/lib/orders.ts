@@ -1,7 +1,14 @@
 import { listOrders, insertOrder, updateOrder as updateOrderFn, deleteOrder as deleteOrderFn } from "@/lib/api/orders.functions";
+import {
+  listProductionEntries,
+  insertProductionEntry,
+  deleteProductionEntry as deleteProductionEntryFn,
+} from "@/lib/api/production-entries.functions";
 
 export type Sector = "extrusora" | "moagem";
 export type Status = "pendente" | "em_producao" | "concluida";
+export type EmbalagemTipo = "bigbag" | "saco";
+export type Turno = "A" | "B" | "C";
 
 export type Order = {
   id: string;
@@ -13,11 +20,11 @@ export type Order = {
   produto: string;
   linha_envase: string | null;
   total_pedido: string | null;
-  embalagem: string | null;
+  embalagem_tipo: EmbalagemTipo | null;
+  peso_unitario_kg: number | null;
+  quantidade_total: number | null;
   observacao: string | null;
   status: Status;
-  turno: string | null;
-  scheduled_date: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -29,6 +36,14 @@ export type OrderInsert = Omit<Order, "id" | "created_at" | "updated_at" | "sequ
 
 export type OrderUpdate = Partial<OrderInsert>;
 
+export type ProductionEntry = {
+  id: string;
+  order_id: string;
+  turno: Turno;
+  quantidade: number;
+  created_at: string;
+};
+
 export const STATUS_LABEL: Record<Status, string> = {
   pendente: "Pendente",
   em_producao: "Em produção",
@@ -38,6 +53,21 @@ export const STATUS_LABEL: Record<Status, string> = {
 export const SECTOR_LABEL: Record<Sector, string> = {
   extrusora: "Extrusora",
   moagem: "Moagem",
+};
+
+export const EMBALAGEM_LABEL: Record<EmbalagemTipo, string> = {
+  bigbag: "Big Bag",
+  saco: "Saco",
+};
+
+export const EMBALAGEM_UNIT_LABEL: Record<EmbalagemTipo, string> = {
+  bigbag: "big bags",
+  saco: "sacos",
+};
+
+export const PESO_PRESETS: Record<EmbalagemTipo, number[]> = {
+  bigbag: [800, 1000],
+  saco: [20, 25],
 };
 
 export async function fetchOrders(): Promise<Order[]> {
@@ -54,4 +84,16 @@ export async function updateOrder(id: string, patch: OrderUpdate) {
 
 export async function deleteOrder(id: string) {
   await deleteOrderFn({ data: { id } });
+}
+
+export async function fetchProductionEntries(): Promise<ProductionEntry[]> {
+  return listProductionEntries();
+}
+
+export async function addProductionEntry(input: { order_id: string; turno: Turno; quantidade: number }) {
+  await insertProductionEntry({ data: input });
+}
+
+export async function deleteProductionEntry(id: string) {
+  await deleteProductionEntryFn({ data: { id } });
 }
