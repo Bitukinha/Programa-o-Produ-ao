@@ -87,7 +87,7 @@ export function OrderCard({
 
   const produzido = orderEntries.reduce((sum, e) => sum + e.quantidade, 0);
   const meta = order.quantidade_total ?? null;
-  const pct = meta ? Math.min(100, Math.round((produzido / meta) * 100)) : null;
+  const pct = meta ? Math.min(100, Math.round((produzido / meta) * 100)) : produzido > 0 ? 100 : null;
   const unit = order.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[order.embalagem_tipo] : "unidades";
 
   return (
@@ -123,13 +123,13 @@ export function OrderCard({
           {meta && <Info label="Meta" value={`${meta} ${unit}`} />}
         </div>
 
-        {meta && (
+        {(meta || produzido > 0) && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                Produzido: {produzido} / {meta} {unit}
+                Produzido: {produzido}{meta ? ` / ${meta}` : ""} {unit}
               </span>
-              <span className="font-semibold">{pct}%</span>
+              {pct !== null && <span className="font-semibold">{pct}%</span>}
             </div>
             <Progress value={pct ?? 0} />
           </div>
