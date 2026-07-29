@@ -28,7 +28,10 @@ export const listOrders = createServerFn({ method: "GET" }).handler(async () => 
   const { rows } = await pool.query(
     `SELECT * FROM production_orders ORDER BY sector ASC, sequence ASC`,
   );
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    peso_unitario_kg: r.peso_unitario_kg === null ? null : Number(r.peso_unitario_kg),
+  }));
 });
 
 export const insertOrder = createServerFn({ method: "POST" })
