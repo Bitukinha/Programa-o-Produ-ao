@@ -120,7 +120,7 @@ export function ProductionEntryForm({
           />
         </div>
 
-        <div className={isSaco ? "col-span-2 space-y-1.5" : "space-y-1.5"}>
+        <div className="col-span-2 space-y-1.5">
           <Label>{isSaco ? "Lacre do palete" : "Lacre"}</Label>
           <Input
             value={lacre}
