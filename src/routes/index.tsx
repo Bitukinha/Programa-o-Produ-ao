@@ -5,9 +5,16 @@ import { Plus, Factory, Wheat, Loader2, FileDown, ShieldCheck, LogOut } from "lu
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OrderCard } from "@/components/OrderCard";
 import { OrderFormDialog } from "@/components/OrderFormDialog";
-import { fetchOrders, fetchProductionEntries, SECTOR_LABEL, type Sector } from "@/lib/orders";
+import {
+  fetchOrders,
+  fetchProductionEntries,
+  SECTOR_LABEL,
+  type Order,
+  type Sector,
+} from "@/lib/orders";
 import { fetchAuthStatus, logoutPcp } from "@/lib/auth";
 import { generateProductionPdf } from "@/lib/generate-pdf";
 import logoUrl from "@/assets/nutrimilho-logo.png";
@@ -48,7 +55,45 @@ function Index() {
     setDialogOpen(true);
   };
 
-  const bySector = (s: Sector) => (orders ?? []).filter((o) => o.sector === s);
+  const activeOrders = (orders ?? []).filter((o) => o.status !== "concluida");
+  const doneOrders = (orders ?? []).filter((o) => o.status === "concluida");
+
+  const renderSections = (list: Order[], opts: { showAdd: boolean; emptyMessage: string }) =>
+    (["extrusora", "moagem"] as Sector[]).map((sector) => {
+      const secList = list.filter((o) => o.sector === sector);
+      const Icon = sector === "extrusora" ? Factory : Wheat;
+      return (
+        <section key={sector}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary grid place-items-center">
+                <Icon className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{SECTOR_LABEL[sector]} — Produção</h2>
+                <p className="text-xs text-muted-foreground">{secList.length} ordem(ns)</p>
+              </div>
+            </div>
+            {opts.showAdd && isPcp && (
+              <Button variant="outline" size="sm" onClick={() => openNew(sector)}>
+                <Plus className="h-4 w-4 mr-1" /> Adicionar
+              </Button>
+            )}
+          </div>
+          {secList.length === 0 ? (
+            <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+              {opts.emptyMessage}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {secList.map((o) => (
+                <OrderCard key={o.id} order={o} entries={entries ?? []} />
+              ))}
+            </div>
+          )}
+        </section>
+      );
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,47 +154,37 @@ function Index() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {isLoading ? (
           <div className="flex items-center justify-center py-20 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando...
           </div>
+        ) : isPcp ? (
+          <Tabs defaultValue="ativas">
+            <TabsList>
+              <TabsTrigger value="ativas">Produção</TabsTrigger>
+              <TabsTrigger value="concluidas">Concluídas ({doneOrders.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="ativas" className="space-y-10 pt-6">
+              {renderSections(activeOrders, {
+                showAdd: true,
+                emptyMessage: "Nenhuma ordem em produção.",
+              })}
+            </TabsContent>
+            <TabsContent value="concluidas" className="space-y-10 pt-6">
+              {renderSections(doneOrders, {
+                showAdd: false,
+                emptyMessage: "Nenhuma ordem concluída ainda.",
+              })}
+            </TabsContent>
+          </Tabs>
         ) : (
-          (["extrusora", "moagem"] as Sector[]).map((sector) => {
-            const list = bySector(sector);
-            const Icon = sector === "extrusora" ? Factory : Wheat;
-            return (
-              <section key={sector}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary grid place-items-center">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold">{SECTOR_LABEL[sector]} — Produção</h2>
-                      <p className="text-xs text-muted-foreground">{list.length} ordem(ns)</p>
-                    </div>
-                  </div>
-                  {isPcp && (
-                    <Button variant="outline" size="sm" onClick={() => openNew(sector)}>
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar
-                    </Button>
-                  )}
-                </div>
-                {list.length === 0 ? (
-                  <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-                    Nenhuma ordem cadastrada.
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {list.map((o) => (
-                      <OrderCard key={o.id} order={o} entries={entries ?? []} />
-                    ))}
-                  </div>
-                )}
-              </section>
-            );
-          })
+          <div className="space-y-10">
+            {renderSections(activeOrders, {
+              showAdd: false,
+              emptyMessage: "Nenhuma ordem em produção.",
+            })}
+          </div>
         )}
       </main>
 
