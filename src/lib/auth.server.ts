@@ -5,10 +5,12 @@ import { useSession } from "@tanstack/react-start/server";
 const SESSION_PASSWORD =
   process.env.SESSION_SECRET || "nutrimilho-producao-flow-tracker-session-secret-2026";
 const PCP_PASSWORD = process.env.PCP_PASSWORD || "Mudar@123";
+const QUALIDADE_PASSWORD = process.env.QUALIDADE_PASSWORD || "Mudar@123";
 
 export type PcpNome = "Jean" | "Matheus";
+export type Role = "pcp" | "qualidade";
 
-type AuthSessionData = { role?: "pcp"; nome?: PcpNome };
+type AuthSessionData = { role?: Role; nome?: PcpNome };
 
 function authSession() {
   // Not a React hook — this is h3/TanStack Start's server-side session helper.
@@ -20,15 +22,30 @@ function authSession() {
   });
 }
 
-export async function getSessionRole(): Promise<{ isPcp: boolean; nome: PcpNome | null }> {
+export async function getSessionRole(): Promise<{
+  isPcp: boolean;
+  isQualidade: boolean;
+  nome: PcpNome | null;
+}> {
   const session = await authSession();
-  return { isPcp: session.data.role === "pcp", nome: session.data.nome ?? null };
+  return {
+    isPcp: session.data.role === "pcp",
+    isQualidade: session.data.role === "qualidade",
+    nome: session.data.nome ?? null,
+  };
 }
 
 export async function requirePcp(): Promise<void> {
   const { isPcp } = await getSessionRole();
   if (!isPcp) {
     throw new Error("Acesso restrito ao PCP.");
+  }
+}
+
+export async function requireQualidade(): Promise<void> {
+  const { isQualidade } = await getSessionRole();
+  if (!isQualidade) {
+    throw new Error("Acesso restrito à Qualidade.");
   }
 }
 
@@ -40,7 +57,15 @@ export async function loginAsPcp(password: string, nome: PcpNome): Promise<void>
   await session.update({ role: "pcp", nome });
 }
 
-export async function logoutPcpSession(): Promise<void> {
+export async function loginAsQualidade(password: string): Promise<void> {
+  if (password !== QUALIDADE_PASSWORD) {
+    throw new Error("Senha incorreta.");
+  }
+  const session = await authSession();
+  await session.update({ role: "qualidade", nome: undefined });
+}
+
+export async function logoutSession(): Promise<void> {
   const session = await authSession();
   await session.clear();
 }

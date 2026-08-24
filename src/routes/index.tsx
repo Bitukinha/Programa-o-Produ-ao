@@ -1,7 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Factory, Wheat, Loader2, FileDown, ShieldCheck, LogOut } from "lucide-react";
+import {
+  Plus,
+  Factory,
+  Wheat,
+  Loader2,
+  FileDown,
+  ShieldCheck,
+  ShieldAlert,
+  LogOut,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
@@ -15,7 +24,7 @@ import {
   type Order,
   type Sector,
 } from "@/lib/orders";
-import { fetchAuthStatus, logoutPcp } from "@/lib/auth";
+import { fetchAuthStatus, logoutSession } from "@/lib/auth";
 import { generateProductionPdf } from "@/lib/generate-pdf";
 import logoUrl from "@/assets/nutrimilho-logo.png";
 
@@ -38,15 +47,16 @@ function Index() {
   });
   const { data: auth } = useQuery({ queryKey: ["auth"], queryFn: fetchAuthStatus });
   const isPcp = auth?.isPcp ?? false;
+  const isQualidade = auth?.isQualidade ?? false;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [defaultSector, setDefaultSector] = useState<Sector>("extrusora");
 
   const logout = useMutation({
-    mutationFn: logoutPcp,
+    mutationFn: logoutSession,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["auth"] });
-      toast.success("Sessão do PCP encerrada");
+      toast.success("Sessão encerrada");
     },
   });
 
@@ -129,26 +139,33 @@ function Index() {
             >
               <FileDown className="h-4 w-4 mr-2" /> Gerar PDF
             </Button>
-            {isPcp ? (
+            {isPcp && (
+              <Button onClick={() => openNew("extrusora")} size="lg">
+                <Plus className="h-4 w-4 mr-2" /> Nova Ordem
+              </Button>
+            )}
+            {isPcp || isQualidade ? (
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={() => logout.mutate()}
+                disabled={logout.isPending}
+              >
+                <LogOut className="h-4 w-4 mr-2" /> Sair ({isPcp ? auth?.nome : "Qualidade"})
+              </Button>
+            ) : (
               <>
-                <Button onClick={() => openNew("extrusora")} size="lg">
-                  <Plus className="h-4 w-4 mr-2" /> Nova Ordem
+                <Button variant="outline" size="lg" asChild>
+                  <Link to="/pcp-login">
+                    <ShieldCheck className="h-4 w-4 mr-2" /> Acesso PCP
+                  </Link>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  onClick={() => logout.mutate()}
-                  disabled={logout.isPending}
-                >
-                  <LogOut className="h-4 w-4 mr-2" /> Sair ({auth?.nome})
+                <Button variant="outline" size="lg" asChild>
+                  <Link to="/qualidade-login">
+                    <ShieldAlert className="h-4 w-4 mr-2" /> Acesso Qualidade
+                  </Link>
                 </Button>
               </>
-            ) : (
-              <Button variant="outline" size="lg" asChild>
-                <Link to="/pcp-login">
-                  <ShieldCheck className="h-4 w-4 mr-2" /> Acesso PCP
-                </Link>
-              </Button>
             )}
           </div>
         </div>
@@ -159,7 +176,7 @@ function Index() {
           <div className="flex items-center justify-center py-20 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando...
           </div>
-        ) : isPcp ? (
+        ) : isPcp || isQualidade ? (
           <Tabs defaultValue="ativas">
             <TabsList>
               <TabsTrigger value="ativas">Produção</TabsTrigger>

@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as QualidadeLoginRouteImport } from './routes/qualidade-login'
 import { Route as PcpLoginRouteImport } from './routes/pcp-login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrdensIdRouteImport } from './routes/ordens.$id'
 
+const QualidadeLoginRoute = QualidadeLoginRouteImport.update({
+  id: '/qualidade-login',
+  path: '/qualidade-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PcpLoginRoute = PcpLoginRouteImport.update({
   id: '/pcp-login',
   path: '/pcp-login',
@@ -32,35 +38,46 @@ const OrdensIdRoute = OrdensIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/pcp-login': typeof PcpLoginRoute
+  '/qualidade-login': typeof QualidadeLoginRoute
   '/ordens/$id': typeof OrdensIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/pcp-login': typeof PcpLoginRoute
+  '/qualidade-login': typeof QualidadeLoginRoute
   '/ordens/$id': typeof OrdensIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/pcp-login': typeof PcpLoginRoute
+  '/qualidade-login': typeof QualidadeLoginRoute
   '/ordens/$id': typeof OrdensIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/pcp-login' | '/ordens/$id'
+  fullPaths: '/' | '/pcp-login' | '/qualidade-login' | '/ordens/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/pcp-login' | '/ordens/$id'
-  id: '__root__' | '/' | '/pcp-login' | '/ordens/$id'
+  to: '/' | '/pcp-login' | '/qualidade-login' | '/ordens/$id'
+  id: '__root__' | '/' | '/pcp-login' | '/qualidade-login' | '/ordens/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PcpLoginRoute: typeof PcpLoginRoute
+  QualidadeLoginRoute: typeof QualidadeLoginRoute
   OrdensIdRoute: typeof OrdensIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/qualidade-login': {
+      id: '/qualidade-login'
+      path: '/qualidade-login'
+      fullPath: '/qualidade-login'
+      preLoaderRoute: typeof QualidadeLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pcp-login': {
       id: '/pcp-login'
       path: '/pcp-login'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PcpLoginRoute: PcpLoginRoute,
+  QualidadeLoginRoute: QualidadeLoginRoute,
   OrdensIdRoute: OrdensIdRoute,
 }
 export const routeTree = rootRouteImport

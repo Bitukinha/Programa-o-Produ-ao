@@ -1,12 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, Pencil, Trash2, FileDown, Package, Factory, Loader2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Pencil,
+  Trash2,
+  FileDown,
+  Package,
+  Factory,
+  Loader2,
+  X,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,6 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +52,8 @@ import {
   fetchProductionEntries,
   deleteOrder,
   deleteProductionEntry,
+  blockProductionEntry,
+  unblockProductionEntry,
   updateOrder,
   EMBALAGEM_LABEL,
   EMBALAGEM_UNIT_LABEL,
@@ -57,6 +79,8 @@ function OrderDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState("");
 
   const { data: orders, isLoading } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders });
   const { data: entries } = useQuery({
@@ -65,6 +89,7 @@ function OrderDetail() {
   });
   const { data: auth } = useQuery({ queryKey: ["auth"], queryFn: fetchAuthStatus });
   const isPcp = auth?.isPcp ?? false;
+  const isQualidade = auth?.isQualidade ?? false;
 
   const order = orders?.find((o) => o.id === id) ?? null;
   const orderEntries = (entries ?? [])
@@ -100,6 +125,28 @@ function OrderDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const block = useMutation({
+    mutationFn: () => blockProductionEntry(blockTarget as string, motivo),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["production-entries"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      toast.success("Lançamento bloqueado");
+      setBlockTarget(null);
+      setMotivo("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const unblock = useMutation({
+    mutationFn: (entryId: string) => unblockProductionEntry(entryId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["production-entries"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      toast.success("Lançamento desbloqueado");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
@@ -119,7 +166,9 @@ function OrderDetail() {
     );
   }
 
-  const produzido = orderEntries.reduce((sum, e) => sum + e.quantidade, 0);
+  const produzido = orderEntries
+    .filter((e) => !e.bloqueado)
+    .reduce((sum, e) => sum + e.quantidade, 0);
   const meta = order.quantidade_total ?? null;
   const pct = meta ? Math.min(100, Math.round((produzido / meta) * 100)) : null;
   const unit = order.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[order.embalagem_tipo] : "unidades";
@@ -200,39 +249,73 @@ function OrderDetail() {
                   {orderEntries.map((e) => (
                     <div
                       key={e.id}
-                      className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm"
+                      className={
+                        e.bloqueado
+                          ? "rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm"
+                          : "rounded-md bg-muted/40 px-3 py-2 text-sm"
+                      }
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          TURNO {e.turno}
-                        </Badge>
-                        <span className="font-medium">
-                          {e.quantidade} {unit}
-                        </span>
-                        {e.peso_kg != null && (
-                          <span className="text-muted-foreground">· {e.peso_kg} kg</span>
-                        )}
-                        {e.lacre && (
-                          <span className="text-muted-foreground">· Lacre {e.lacre}</span>
-                        )}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            TURNO {e.turno}
+                          </Badge>
+                          <span className="font-medium">
+                            {e.quantidade} {unit}
+                          </span>
+                          {e.peso_kg != null && (
+                            <span className="text-muted-foreground">· {e.peso_kg} kg</span>
+                          )}
+                          {e.lacre && (
+                            <span className="text-muted-foreground">· Lacre {e.lacre}</span>
+                          )}
+                          {e.bloqueado && (
+                            <Badge variant="destructive" className="text-[10px]">
+                              BLOQUEADO
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                          <span className="text-xs">
+                            {new Date(e.created_at).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          {isQualidade &&
+                            (e.bloqueado ? (
+                              <button
+                                onClick={() => unblock.mutate(e.id)}
+                                className="hover:text-primary"
+                                aria-label="Desbloquear lançamento"
+                                title="Desbloquear"
+                              >
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setBlockTarget(e.id)}
+                                className="hover:text-destructive"
+                                aria-label="Bloquear lançamento"
+                                title="Bloquear"
+                              >
+                                <ShieldAlert className="h-3.5 w-3.5" />
+                              </button>
+                            ))}
+                          <button
+                            onClick={() => delEntry.mutate(e.id)}
+                            className="hover:text-destructive"
+                            aria-label="Remover lançamento"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground shrink-0">
-                        <span className="text-xs">
-                          {new Date(e.created_at).toLocaleString("pt-BR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        <button
-                          onClick={() => delEntry.mutate(e.id)}
-                          className="hover:text-destructive"
-                          aria-label="Remover lançamento"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      {e.bloqueado && e.motivo_bloqueio && (
+                        <p className="mt-1 text-xs text-destructive">Motivo: {e.motivo_bloqueio}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -334,6 +417,44 @@ function OrderDetail() {
           defaultSector={order.sector}
         />
       )}
+
+      <Dialog
+        open={blockTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBlockTarget(null);
+            setMotivo("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bloquear lançamento</DialogTitle>
+            <DialogDescription>
+              Informe o motivo do bloqueio. Ele deixará de contar na meta da OP até ser
+              desbloqueado.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ex: peso fora do padrão, lacre violado, etc."
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBlockTarget(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!motivo.trim() || block.isPending}
+              onClick={() => block.mutate()}
+            >
+              {block.isPending ? "Bloqueando..." : "Bloquear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

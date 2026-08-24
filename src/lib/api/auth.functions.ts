@@ -13,7 +13,14 @@ export const loginPcp = createServerFn({ method: "POST" })
     await loginAsPcp(data.password, data.nome);
   });
 
-export const logoutPcp = createServerFn({ method: "POST" }).handler(async () => {
-  const { logoutPcpSession } = await import("../auth.server");
-  await logoutPcpSession();
+export const loginQualidade = createServerFn({ method: "POST" })
+  .validator(z.object({ password: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const { loginAsQualidade } = await import("../auth.server");
+    await loginAsQualidade(data.password);
+  });
+
+export const logoutSession = createServerFn({ method: "POST" }).handler(async () => {
+  const { logoutSession: clear } = await import("../auth.server");
+  await clear();
 });

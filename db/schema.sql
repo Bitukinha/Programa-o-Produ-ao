@@ -32,6 +32,8 @@ CREATE TABLE production_entries (
   quantidade INTEGER NOT NULL CHECK (quantidade > 0),
   peso_kg NUMERIC,
   lacre TEXT,
+  bloqueado BOOLEAN NOT NULL DEFAULT false,
+  motivo_bloqueio TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

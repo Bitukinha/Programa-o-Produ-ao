@@ -8,6 +8,8 @@ import {
   listProductionEntries,
   insertProductionEntry,
   deleteProductionEntry as deleteProductionEntryFn,
+  blockProductionEntry as blockProductionEntryFn,
+  unblockProductionEntry as unblockProductionEntryFn,
 } from "@/lib/api/production-entries.functions";
 
 export type Sector = "extrusora" | "moagem";
@@ -51,6 +53,8 @@ export type ProductionEntry = {
   quantidade: number;
   peso_kg: number | null;
   lacre: string | null;
+  bloqueado: boolean;
+  motivo_bloqueio: string | null;
   created_at: string;
 };
 
@@ -112,4 +116,12 @@ export async function addProductionEntry(input: {
 
 export async function deleteProductionEntry(id: string) {
   await deleteProductionEntryFn({ data: { id } });
+}
+
+export async function blockProductionEntry(id: string, motivo: string) {
+  await blockProductionEntryFn({ data: { id, motivo } });
+}
+
+export async function unblockProductionEntry(id: string) {
+  await unblockProductionEntryFn({ data: { id } });
 }

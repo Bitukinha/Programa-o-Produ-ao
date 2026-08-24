@@ -71,7 +71,7 @@ export function ProductionEntryForm({
   });
 
   const canSubmit = isSaco
-    ? Number(quantidade) > 0 && peso !== "" && Number(peso) > 0 && lacre.trim() !== ""
+    ? Number(quantidade) > 0 && peso !== "" && Number(peso) > 0
     : peso !== "" && Number(peso) > 0 && lacre.trim() !== "";
 
   return (
@@ -120,14 +120,16 @@ export function ProductionEntryForm({
           />
         </div>
 
-        <div className="col-span-2 space-y-1.5">
-          <Label>{isSaco ? "Lacre do palete" : "Lacre"}</Label>
-          <Input
-            value={lacre}
-            onChange={(e) => setLacre(e.target.value)}
-            placeholder="Nº do lacre"
-          />
-        </div>
+        {!isSaco && (
+          <div className="col-span-2 space-y-1.5">
+            <Label>Lacre</Label>
+            <Input
+              value={lacre}
+              onChange={(e) => setLacre(e.target.value)}
+              placeholder="Nº do lacre"
+            />
+          </div>
+        )}
       </div>
 
       <Button
