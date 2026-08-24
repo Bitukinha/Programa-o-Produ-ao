@@ -322,17 +322,24 @@ export async function generateOrderPdf(op: Order, entries: ProductionEntry[]) {
     doc.text("Nenhum lançamento de produção registrado.", margin, cursorY + 14);
   } else {
     const unit = op.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[op.embalagem_tipo] : "un.";
+    const isSaco = op.embalagem_tipo === "saco";
     autoTable(doc, {
       startY: cursorY,
       margin: { left: margin, right: margin },
-      head: [["Data/Hora", "Turno", `Quantidade (${unit})`, "Peso (kg)", "Lacre"]],
-      body: sorted.map((e) => [
-        new Date(e.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
-        e.turno,
-        String(e.quantidade),
-        e.peso_kg != null ? String(e.peso_kg) : "—",
-        e.lacre || "—",
-      ]),
+      head: [
+        isSaco
+          ? ["Data/Hora", "Turno", `Quantidade (${unit})`, "Peso (kg)"]
+          : ["Data/Hora", "Turno", `Quantidade (${unit})`, "Peso (kg)", "Lacre"],
+      ],
+      body: sorted.map((e) => {
+        const row = [
+          new Date(e.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
+          e.turno,
+          String(e.quantidade),
+          e.peso_kg != null ? String(e.peso_kg) : "—",
+        ];
+        return isSaco ? row : [...row, e.lacre || "—"];
+      }),
       theme: "grid",
       headStyles: { fillColor: GREEN, textColor: 255, fontStyle: "bold" },
       styles: { fontSize: 10, cellPadding: 5, textColor: [20, 20, 20], lineColor: [221, 221, 221] },
