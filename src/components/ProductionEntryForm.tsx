@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -13,46 +12,81 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addProductionEntry, EMBALAGEM_UNIT_LABEL, type EmbalagemTipo, type Turno } from "@/lib/orders";
+import { addProductionEntry, type EmbalagemTipo, type Turno } from "@/lib/orders";
 
 export function ProductionEntryForm({
   orderId,
   embalagemTipo,
+  pesoUnitarioKg,
 }: {
   orderId: string;
   embalagemTipo: EmbalagemTipo | null;
+  pesoUnitarioKg: number | null;
 }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [turno, setTurno] = useState<Turno>("A");
-  const [quantidade, setQuantidade] = useState("");
+  const [quantidade, setQuantidade] = useState(""); // sacos por palete (só usado para "saco")
+  const [peso, setPeso] = useState("");
+  const [lacre, setLacre] = useState("");
+
+  const isSaco = embalagemTipo === "saco";
+  const isBigbag = embalagemTipo === "bigbag";
+
+  // Sugere o peso do palete com base no peso unitário do saco x quantidade informada.
+  useEffect(() => {
+    if (isBigbag) {
+      setPeso(pesoUnitarioKg != null ? String(pesoUnitarioKg) : "");
+    }
+  }, [isBigbag, pesoUnitarioKg]);
+
+  useEffect(() => {
+    if (isSaco && pesoUnitarioKg != null && quantidade && Number(quantidade) > 0) {
+      setPeso(String(Number(quantidade) * pesoUnitarioKg));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantidade]);
+
+  const reset = () => {
+    setQuantidade("");
+    setPeso(isBigbag && pesoUnitarioKg != null ? String(pesoUnitarioKg) : "");
+    setLacre("");
+  };
 
   const mutation = useMutation({
-    mutationFn: () => addProductionEntry({ order_id: orderId, turno, quantidade: Number(quantidade) }),
+    mutationFn: () =>
+      addProductionEntry({
+        order_id: orderId,
+        turno,
+        quantidade: isSaco ? Number(quantidade) : 1,
+        peso_kg: peso ? Number(peso) : null,
+        lacre: lacre.trim() || null,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["production-entries"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Produção lançada");
-      setQuantidade("");
-      setOpen(false);
+      reset();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const unit = embalagemTipo ? EMBALAGEM_UNIT_LABEL[embalagemTipo] : "unidades";
+  const canSubmit = isSaco
+    ? Number(quantidade) > 0 && peso !== "" && Number(peso) > 0 && lacre.trim() !== ""
+    : peso !== "" && Number(peso) > 0 && lacre.trim() !== "";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="outline">
-          <ClipboardList className="h-4 w-4 mr-1" /> Lançar produção
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 space-y-3">
-        <div className="space-y-2">
+    <div className="rounded-lg border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 font-semibold text-sm">
+        <ClipboardList className="h-4 w-4" /> Apontar produção
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
           <Label>Turno</Label>
           <Select value={turno} onValueChange={(v) => setTurno(v as Turno)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="A">Turno A</SelectItem>
               <SelectItem value="B">Turno B</SelectItem>
@@ -60,25 +94,49 @@ export function ProductionEntryForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>Quantidade produzida ({unit})</Label>
+
+        {isSaco && (
+          <div className="space-y-1.5">
+            <Label>Sacos no palete</Label>
+            <Input
+              type="number"
+              min={1}
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+              placeholder="Ex: 50"
+            />
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <Label>{isSaco ? "Peso do palete (kg)" : "Peso do bag (kg)"}</Label>
           <Input
             type="number"
-            min={1}
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            placeholder="Ex: 10"
+            min={0}
+            step="0.1"
+            value={peso}
+            onChange={(e) => setPeso(e.target.value)}
+            placeholder="Ex: 1000"
           />
         </div>
-        <Button
-          className="w-full"
-          size="sm"
-          disabled={!quantidade || Number(quantidade) <= 0 || mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
-          {mutation.isPending ? "Salvando..." : "Confirmar"}
-        </Button>
-      </PopoverContent>
-    </Popover>
+
+        <div className={isSaco ? "col-span-2 space-y-1.5" : "space-y-1.5"}>
+          <Label>{isSaco ? "Lacre do palete" : "Lacre"}</Label>
+          <Input
+            value={lacre}
+            onChange={(e) => setLacre(e.target.value)}
+            placeholder="Nº do lacre"
+          />
+        </div>
+      </div>
+
+      <Button
+        className="w-full"
+        disabled={!canSubmit || mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        {mutation.isPending ? "Salvando..." : isSaco ? "Confirmar palete" : "Confirmar bag"}
+      </Button>
+    </div>
   );
 }

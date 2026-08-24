@@ -1,13 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Factory, Wheat, Loader2, FileDown } from "lucide-react";
+import { Plus, Factory, Wheat, Loader2, FileDown, ShieldCheck, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { OrderCard } from "@/components/OrderCard";
 import { OrderFormDialog } from "@/components/OrderFormDialog";
-import { fetchOrders, fetchProductionEntries, SECTOR_LABEL, type Order, type Sector } from "@/lib/orders";
+import { fetchOrders, fetchProductionEntries, SECTOR_LABEL, type Sector } from "@/lib/orders";
+import { fetchAuthStatus, logoutPcp } from "@/lib/auth";
 import { generateProductionPdf } from "@/lib/generate-pdf";
 import logoUrl from "@/assets/nutrimilho-logo.png";
 
@@ -22,21 +23,28 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const qc = useQueryClient();
   const { data: orders, isLoading } = useQuery({ queryKey: ["orders"], queryFn: fetchOrders });
-  const { data: entries } = useQuery({ queryKey: ["production-entries"], queryFn: fetchProductionEntries });
+  const { data: entries } = useQuery({
+    queryKey: ["production-entries"],
+    queryFn: fetchProductionEntries,
+  });
+  const { data: auth } = useQuery({ queryKey: ["auth"], queryFn: fetchAuthStatus });
+  const isPcp = auth?.isPcp ?? false;
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Order | null>(null);
   const [defaultSector, setDefaultSector] = useState<Sector>("extrusora");
 
-  const openNew = (sector: Sector) => {
-    setEditing(null);
-    setDefaultSector(sector);
-    setDialogOpen(true);
-  };
+  const logout = useMutation({
+    mutationFn: logoutPcp,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth"] });
+      toast.success("Sessão do PCP encerrada");
+    },
+  });
 
-  const openEdit = (order: Order) => {
-    setEditing(order);
-    setDefaultSector(order.sector);
+  const openNew = (sector: Sector) => {
+    setDefaultSector(sector);
     setDialogOpen(true);
   };
 
@@ -49,11 +57,15 @@ function Index() {
           <div className="flex items-center gap-4">
             <img src={logoUrl} alt="Nutrimilho" className="h-12 w-auto" />
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Programação de Produção</h1>
-              <p className="text-sm text-muted-foreground mt-1">Gerencie as ordens de Extrusora e Moagem.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">
+                Programação de Produção
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Gerencie as ordens de Extrusora e Moagem.
+              </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="lg"
@@ -72,9 +84,27 @@ function Index() {
             >
               <FileDown className="h-4 w-4 mr-2" /> Gerar PDF
             </Button>
-            <Button onClick={() => openNew("extrusora")} size="lg">
-              <Plus className="h-4 w-4 mr-2" /> Nova Ordem
-            </Button>
+            {isPcp ? (
+              <>
+                <Button onClick={() => openNew("extrusora")} size="lg">
+                  <Plus className="h-4 w-4 mr-2" /> Nova Ordem
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                >
+                  <LogOut className="h-4 w-4 mr-2" /> Sair ({auth?.nome})
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="lg" asChild>
+                <Link to="/pcp-login">
+                  <ShieldCheck className="h-4 w-4 mr-2" /> Acesso PCP
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -100,9 +130,11 @@ function Index() {
                       <p className="text-xs text-muted-foreground">{list.length} ordem(ns)</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => openNew(sector)}>
-                    <Plus className="h-4 w-4 mr-1" /> Adicionar
-                  </Button>
+                  {isPcp && (
+                    <Button variant="outline" size="sm" onClick={() => openNew(sector)}>
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar
+                    </Button>
+                  )}
                 </div>
                 {list.length === 0 ? (
                   <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
@@ -111,7 +143,7 @@ function Index() {
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {list.map((o) => (
-                      <OrderCard key={o.id} order={o} entries={entries ?? []} onEdit={openEdit} />
+                      <OrderCard key={o.id} order={o} entries={entries ?? []} />
                     ))}
                   </div>
                 )}
@@ -127,12 +159,14 @@ function Index() {
         </div>
       </footer>
 
-      <OrderFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        order={editing}
-        defaultSector={defaultSector}
-      />
+      {isPcp && (
+        <OrderFormDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          order={null}
+          defaultSector={defaultSector}
+        />
+      )}
       <Toaster richColors position="top-right" />
     </div>
   );

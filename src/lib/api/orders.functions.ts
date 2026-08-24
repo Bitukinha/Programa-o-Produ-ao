@@ -37,6 +37,8 @@ export const listOrders = createServerFn({ method: "GET" }).handler(async () => 
 export const insertOrder = createServerFn({ method: "POST" })
   .validator(orderInsertSchema)
   .handler(async ({ data }) => {
+    const { requirePcp } = await import("../auth.server");
+    await requirePcp();
     const { pool } = await import("../db.server");
     const columns = Object.keys(data) as Array<keyof typeof data>;
     const values = columns.map((key) => data[key]);
@@ -50,6 +52,8 @@ export const insertOrder = createServerFn({ method: "POST" })
 export const updateOrder = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().uuid(), patch: orderUpdateSchema }))
   .handler(async ({ data }) => {
+    const { requirePcp } = await import("../auth.server");
+    await requirePcp();
     const { pool } = await import("../db.server");
     const columns = Object.keys(data.patch) as Array<keyof typeof data.patch>;
     if (columns.length === 0) return;
@@ -64,6 +68,8 @@ export const updateOrder = createServerFn({ method: "POST" })
 export const deleteOrder = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
+    const { requirePcp } = await import("../auth.server");
+    await requirePcp();
     const { pool } = await import("../db.server");
     await pool.query(`DELETE FROM production_orders WHERE id = $1`, [data.id]);
   });

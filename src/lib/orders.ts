@@ -1,4 +1,9 @@
-import { listOrders, insertOrder, updateOrder as updateOrderFn, deleteOrder as deleteOrderFn } from "@/lib/api/orders.functions";
+import {
+  listOrders,
+  insertOrder,
+  updateOrder as updateOrderFn,
+  deleteOrder as deleteOrderFn,
+} from "@/lib/api/orders.functions";
 import {
   listProductionEntries,
   insertProductionEntry,
@@ -29,7 +34,10 @@ export type Order = {
   updated_at: string;
 };
 
-export type OrderInsert = Omit<Order, "id" | "created_at" | "updated_at" | "sequence" | "status"> & {
+export type OrderInsert = Omit<
+  Order,
+  "id" | "created_at" | "updated_at" | "sequence" | "status"
+> & {
   sequence?: number;
   status?: Status;
 };
@@ -41,6 +49,8 @@ export type ProductionEntry = {
   order_id: string;
   turno: Turno;
   quantidade: number;
+  peso_kg: number | null;
+  lacre: string | null;
   created_at: string;
 };
 
@@ -90,7 +100,13 @@ export async function fetchProductionEntries(): Promise<ProductionEntry[]> {
   return listProductionEntries();
 }
 
-export async function addProductionEntry(input: { order_id: string; turno: Turno; quantidade: number }) {
+export async function addProductionEntry(input: {
+  order_id: string;
+  turno: Turno;
+  quantidade: number;
+  peso_kg?: number | null;
+  lacre?: string | null;
+}) {
   await insertProductionEntry({ data: input });
 }
 

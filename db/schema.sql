@@ -30,6 +30,8 @@ CREATE TABLE production_entries (
   order_id UUID NOT NULL REFERENCES production_orders(id) ON DELETE CASCADE,
   turno production_turno NOT NULL,
   quantidade INTEGER NOT NULL CHECK (quantidade > 0),
+  peso_kg NUMERIC,
+  lacre TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

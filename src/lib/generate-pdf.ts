@@ -106,7 +106,6 @@ export async function generateProductionPdf(
 
   let cursorY = 105;
 
-
   const sectors: Sector[] = ["extrusora", "moagem"];
   for (const sector of sectors) {
     const list = orders.filter((o) => o.sector === sector);
@@ -135,10 +134,19 @@ export async function generateProductionPdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
-    doc.text(`Programação de Produção – ${buildShortLabel()}`, margin, doc.internal.pageSize.getHeight() - 20);
-    doc.text(`Página ${i} de ${pageCount}`, pageW - margin, doc.internal.pageSize.getHeight() - 20, {
-      align: "right",
-    });
+    doc.text(
+      `Programação de Produção – ${buildShortLabel()}`,
+      margin,
+      doc.internal.pageSize.getHeight() - 20,
+    );
+    doc.text(
+      `Página ${i} de ${pageCount}`,
+      pageW - margin,
+      doc.internal.pageSize.getHeight() - 20,
+      {
+        align: "right",
+      },
+    );
   }
 
   doc.save(`programacao-producao-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -153,7 +161,14 @@ function ensureSpace(doc: jsPDF, y: number, needed: number): number {
   return y;
 }
 
-function renderOrder(doc: jsPDF, op: Order, produced: number, startY: number, margin: number, pageW: number): number {
+function renderOrder(
+  doc: jsPDF,
+  op: Order,
+  produced: number,
+  startY: number,
+  margin: number,
+  pageW: number,
+): number {
   // Order title
   let y = ensureSpace(doc, startY, 80);
   doc.setFont("helvetica", "bold");
@@ -178,7 +193,9 @@ function renderOrder(doc: jsPDF, op: Order, produced: number, startY: number, ma
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...STATUS_FG[op.status]);
-  doc.text(STATUS_LABEL[op.status].toUpperCase(), pillX + pillW / 2, pillY + 11, { align: "center" });
+  doc.text(STATUS_LABEL[op.status].toUpperCase(), pillX + pillW / 2, pillY + 11, {
+    align: "center",
+  });
 
   y += 8;
 
@@ -194,7 +211,10 @@ function renderOrder(doc: jsPDF, op: Order, produced: number, startY: number, ma
   add("Linha de envase", op.linha_envase);
   add("Total do Pedido", op.total_pedido);
   if (op.embalagem_tipo) {
-    add("Embalagem", `${EMBALAGEM_LABEL[op.embalagem_tipo]}${op.peso_unitario_kg ? ` de ${op.peso_unitario_kg}kg` : ""}`);
+    add(
+      "Embalagem",
+      `${EMBALAGEM_LABEL[op.embalagem_tipo]}${op.peso_unitario_kg ? ` de ${op.peso_unitario_kg}kg` : ""}`,
+    );
   }
   if (op.quantidade_total) {
     const unit = op.embalagem_tipo ? EMBALAGEM_UNIT_LABEL[op.embalagem_tipo] : "un.";
@@ -251,7 +271,9 @@ export async function generateOrderPdf(op: Order, entries: ProductionEntry[]) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.setTextColor(...GREEN);
-  doc.text(`${SECTOR_LABEL[op.sector]} — ${op.sequence}ª Ordem de Produção`, pageW / 2, 60, { align: "center" });
+  doc.text(`${SECTOR_LABEL[op.sector]} — ${op.sequence}ª Ordem de Produção`, pageW / 2, 60, {
+    align: "center",
+  });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(...MUTED);
@@ -289,7 +311,9 @@ export async function generateOrderPdf(op: Order, entries: ProductionEntry[]) {
   doc.text("Histórico de lançamentos", margin, cursorY);
   cursorY += 10;
 
-  const sorted = [...entries].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const sorted = [...entries].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
 
   if (sorted.length === 0) {
     doc.setFont("helvetica", "italic");
@@ -301,11 +325,13 @@ export async function generateOrderPdf(op: Order, entries: ProductionEntry[]) {
     autoTable(doc, {
       startY: cursorY,
       margin: { left: margin, right: margin },
-      head: [["Data/Hora", "Turno", `Quantidade (${unit})`]],
+      head: [["Data/Hora", "Turno", `Quantidade (${unit})`, "Peso (kg)", "Lacre"]],
       body: sorted.map((e) => [
         new Date(e.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
         e.turno,
         String(e.quantidade),
+        e.peso_kg != null ? String(e.peso_kg) : "—",
+        e.lacre || "—",
       ]),
       theme: "grid",
       headStyles: { fillColor: GREEN, textColor: 255, fontStyle: "bold" },
@@ -319,7 +345,12 @@ export async function generateOrderPdf(op: Order, entries: ProductionEntry[]) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
-    doc.text(`Página ${i} de ${pageCount}`, pageW - margin, doc.internal.pageSize.getHeight() - 20, { align: "right" });
+    doc.text(
+      `Página ${i} de ${pageCount}`,
+      pageW - margin,
+      doc.internal.pageSize.getHeight() - 20,
+      { align: "right" },
+    );
   }
 
   doc.save(`ordem-${op.sequence}-${op.op_number || op.id.slice(0, 8)}.pdf`);

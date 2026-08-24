@@ -7,12 +7,17 @@ const entryInsertSchema = z.object({
   order_id: z.string().uuid(),
   turno: turnoSchema,
   quantidade: z.number().int().positive(),
+  peso_kg: z.number().positive().nullable().optional(),
+  lacre: z.string().trim().min(1).nullable().optional(),
 });
 
 export const listProductionEntries = createServerFn({ method: "GET" }).handler(async () => {
   const { pool } = await import("../db.server");
   const { rows } = await pool.query(`SELECT * FROM production_entries ORDER BY created_at ASC`);
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    peso_kg: r.peso_kg === null ? null : Number(r.peso_kg),
+  }));
 });
 
 export const insertProductionEntry = createServerFn({ method: "POST" })
@@ -23,8 +28,8 @@ export const insertProductionEntry = createServerFn({ method: "POST" })
     try {
       await client.query("BEGIN");
       await client.query(
-        `INSERT INTO production_entries (order_id, turno, quantidade) VALUES ($1, $2, $3)`,
-        [data.order_id, data.turno, data.quantidade],
+        `INSERT INTO production_entries (order_id, turno, quantidade, peso_kg, lacre) VALUES ($1, $2, $3, $4, $5)`,
+        [data.order_id, data.turno, data.quantidade, data.peso_kg ?? null, data.lacre ?? null],
       );
       const { rows } = await client.query(
         `SELECT
@@ -44,7 +49,9 @@ export const insertProductionEntry = createServerFn({ method: "POST" })
         order.status !== "concluida" &&
         Number(order.produced) >= Number(order.quantidade_total)
       ) {
-        await client.query(`UPDATE production_orders SET status = 'concluida' WHERE id = $1`, [data.order_id]);
+        await client.query(`UPDATE production_orders SET status = 'concluida' WHERE id = $1`, [
+          data.order_id,
+        ]);
       }
       await client.query("COMMIT");
     } catch (e) {
